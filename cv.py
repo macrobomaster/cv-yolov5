@@ -2,7 +2,7 @@ import torch
 import cv2
 import numpy as np
 from kalmanfilter import KalmanFilter
-
+import CvCmdApi
 #load model
 model = torch.hub.load('.', 'custom', path='Trained_model/cv4control_v5n.onnx', source='local')
 #capture video from camera
@@ -20,6 +20,7 @@ cap.set(cv2.CAP_PROP_FPS, 120)
 # cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
 # cap.set(cv2.CAP_PROP_FPS, 120)
 
+cv2control = CvCmdApi.CvCmdHandler()
 kf = KalmanFilter()
 # cap = cv2.VideoCapture('')
 
@@ -38,9 +39,10 @@ while(True):
         y0 = img.pandas().xyxy[0].to_dict('records')[0].get("ymin")
         x1 = img.pandas().xyxy[0].to_dict('records')[0].get("xmax")
         y1 = img.pandas().xyxy[0].to_dict('records')[0].get("ymax")
-        x_cen,y_cen = int((x0+x1)/2),int((y0+y1)/2)
+        x_cen,y_cen = int((x0+x1)/2)-320,240-int((y0+y1)/2)
         print(x_cen,y_cen)
         predict_x, predict_y = kf.predict(x_cen,y_cen)
+        cv2control.CvCmd_Heartbeat(gimbal_coordinate_x=predict_x,gimbal_coordinate_y=predict_y,chassis_speed_x=0,chassis_speed_y=0)
     except:
         pass
     out_img = np.squeeze(img.render())
