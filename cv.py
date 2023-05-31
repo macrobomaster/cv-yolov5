@@ -28,11 +28,9 @@ while(True):
     ret, frame = cap.read()
     predict_x = 0
     predict_y = 0
-    #img_gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY
-    # B, G, R channel splitting
-    #ret, thresh = cv2.threshold(img_gray, 200, 255, cv2.THRESH_BINARY)
-    # visualize the binary image
-    img = frame;
+    img = frame
+    #control mode input
+    oldflags = (False, False, False)
     try:
         img = model(frame)
         x0 = img.pandas().xyxy[0].to_dict('records')[0].get("xmin")
@@ -43,8 +41,8 @@ while(True):
         print(x_cen,y_cen)
         predict_x, predict_y = kf.predict(x_cen,y_cen)
         cv2control.CvCmd_Heartbeat(gimbal_coordinate_x=predict_x,gimbal_coordinate_y=predict_y,chassis_speed_x=0,chassis_speed_y=0)
-    except:
-        pass
+    except Exception as e: 
+        print(e)
     out_img = np.squeeze(img.render())
     cv2.circle(out_img, (predict_x,predict_y), 20, (0, 0, 255), -1)
     cv2.imshow('YOLO', out_img)
