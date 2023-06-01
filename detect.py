@@ -1,4 +1,4 @@
-# YOLOv5 🚀 by Ultralytics, AGPL-3.0 license
+# YOLOv5 🚀 by Ultralytics, GPL-3.0 license
 """
 Run YOLOv5 detection inference on images, videos, directories, globs, YouTube, webcam, streams, etc.
 
@@ -6,10 +6,7 @@ Usage - sources:
     $ python detect.py --weights yolov5s.pt --source 0                               # webcam
                                                      img.jpg                         # image
                                                      vid.mp4                         # video
-                                                     screen                          # screenshot
                                                      path/                           # directory
-                                                     list.txt                        # list of images
-                                                     list.streams                    # list of streams
                                                      'path/*.jpg'                    # glob
                                                      'https://youtu.be/Zgi9g1ksQHc'  # YouTube
                                                      'rtsp://example.com/media.mp4'  # RTSP, RTMP, HTTP stream
@@ -84,7 +81,7 @@ def run(
     save_img = not nosave and not source.endswith('.txt')  # save inference images
     is_file = Path(source).suffix[1:] in (IMG_FORMATS + VID_FORMATS)
     is_url = source.lower().startswith(('rtsp://', 'rtmp://', 'http://', 'https://'))
-    webcam = source.isnumeric() or source.endswith('.streams') or (is_url and not is_file)
+    webcam = source.isnumeric() or source.endswith('.txt') or (is_url and not is_file)
     screenshot = source.lower().startswith('screen')
     if is_url and is_file:
         source = check_file(source)  # download
@@ -252,10 +249,10 @@ def parse_opt():
 
 
 def main(opt):
-    check_requirements(ROOT / 'requirements.txt', exclude=('tensorboard', 'thop'))
+    check_requirements(exclude=('tensorboard', 'thop'))
     run(**vars(opt))
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     opt = parse_opt()
     main(opt)

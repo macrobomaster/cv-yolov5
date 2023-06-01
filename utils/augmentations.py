@@ -1,4 +1,4 @@
-# YOLOv5 🚀 by Ultralytics, AGPL-3.0 license
+# YOLOv5 🚀 by Ultralytics, GPL-3.0 license
 """
 Image augmentation functions
 """
@@ -201,7 +201,7 @@ def random_perspective(im,
     # Transform label coordinates
     n = len(targets)
     if n:
-        use_segments = any(x.any() for x in segments) and len(segments) == n
+        use_segments = any(x.any() for x in segments)
         new = np.zeros((n, 4))
         if use_segments:  # warp segments
             segments = resample_segments(segments)  # upsample
@@ -250,10 +250,12 @@ def copy_paste(im, labels, segments, p=0.5):
             if (ioa < 0.30).all():  # allow 30% obscuration of existing labels
                 labels = np.concatenate((labels, [[l[0], *box]]), 0)
                 segments.append(np.concatenate((w - s[:, 0:1], s[:, 1:2]), 1))
-                cv2.drawContours(im_new, [segments[j].astype(np.int32)], -1, (1, 1, 1), cv2.FILLED)
+                cv2.drawContours(im_new, [segments[j].astype(np.int32)], -1, (255, 255, 255), cv2.FILLED)
 
-        result = cv2.flip(im, 1)  # augment segments (flip left-right)
-        i = cv2.flip(im_new, 1).astype(bool)
+        result = cv2.bitwise_and(src1=im, src2=im_new)
+        result = cv2.flip(result, 1)  # augment segments (flip left-right)
+        i = result > 0  # pixels to replace
+        # i[:, :] = result.max(2).reshape(h, w, 1)  # act over ch
         im[i] = result[i]  # cv2.imwrite('debug.jpg', im)  # debug
 
     return im, labels, segments

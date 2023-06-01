@@ -1,4 +1,4 @@
-# YOLOv5 🚀 by Ultralytics, AGPL-3.0 license
+# YOLOv5 🚀 by Ultralytics, GPL-3.0 license
 """
 Plotting utils
 """
@@ -18,7 +18,6 @@ import pandas as pd
 import seaborn as sn
 import torch
 from PIL import Image, ImageDraw, ImageFont
-from scipy.ndimage.filters import gaussian_filter1d
 
 from utils import TryExcept, threaded
 from utils.general import (CONFIG_DIR, FONT, LOGGER, check_font, check_requirements, clip_boxes, increment_path,
@@ -89,8 +88,7 @@ class Annotator:
         if self.pil or not is_ascii(label):
             self.draw.rectangle(box, width=self.lw, outline=color)  # box
             if label:
-                w, h = self.font.getsize(label)  # text width, height (WARNING: deprecated) in 9.2.0
-                # _, _, w, h = self.font.getbbox(label)  # text width, height (New)
+                w, h = self.font.getsize(label)  # text width, height
                 outside = box[1] - h >= 0  # label fits outside box
                 self.draw.rectangle(
                     (box[0], box[1] - h if outside else box[1], box[0] + w + 1,
@@ -116,7 +114,7 @@ class Annotator:
                             thickness=tf,
                             lineType=cv2.LINE_AA)
 
-    def masks(self, masks, colors, im_gpu, alpha=0.5, retina_masks=False):
+    def masks(self, masks, colors, im_gpu=None, alpha=0.5):
         """Plot masks at once.
         Args:
             masks (tensor): predicted masks on cuda, shape: [n, h, w]
@@ -127,21 +125,37 @@ class Annotator:
         if self.pil:
             # convert to numpy first
             self.im = np.asarray(self.im).copy()
-        if len(masks) == 0:
-            self.im[:] = im_gpu.permute(1, 2, 0).contiguous().cpu().numpy() * 255
-        colors = torch.tensor(colors, device=im_gpu.device, dtype=torch.float32) / 255.0
-        colors = colors[:, None, None]  # shape(n,1,1,3)
-        masks = masks.unsqueeze(3)  # shape(n,h,w,1)
-        masks_color = masks * (colors * alpha)  # shape(n,h,w,3)
+        if im_gpu is None:
+            # Add multiple masks of shape(h,w,n) with colors list([r,g,b], [r,g,b], ...)
+            if len(masks) == 0:
+                return
+            if isinstance(masks, torch.Tensor):
+                masks = torch.as_tensor(masks, dtype=torch.uint8)
+                masks = masks.permute(1, 2, 0).contiguous()
+                masks = masks.cpu().numpy()
+            # masks = np.ascontiguousarray(masks.transpose(1, 2, 0))
+            masks = scale_image(masks.shape[:2], masks, self.im.shape)
+            masks = np.asarray(masks, dtype=np.float32)
+            colors = np.asarray(colors, dtype=np.float32)  # shape(n,3)
+            s = masks.sum(2, keepdims=True).clip(0, 1)  # add all masks together
+            masks = (masks @ colors).clip(0, 255)  # (h,w,n) @ (n,3) = (h,w,3)
+            self.im[:] = masks * alpha + self.im * (1 - s * alpha)
+        else:
+            if len(masks) == 0:
+                self.im[:] = im_gpu.permute(1, 2, 0).contiguous().cpu().numpy() * 255
+            colors = torch.tensor(colors, device=im_gpu.device, dtype=torch.float32) / 255.0
+            colors = colors[:, None, None]  # shape(n,1,1,3)
+            masks = masks.unsqueeze(3)  # shape(n,h,w,1)
+            masks_color = masks * (colors * alpha)  # shape(n,h,w,3)
 
-        inv_alph_masks = (1 - masks * alpha).cumprod(0)  # shape(n,h,w,1)
-        mcs = (masks_color * inv_alph_masks).sum(0) * 2  # mask color summand shape(n,h,w,3)
+            inv_alph_masks = (1 - masks * alpha).cumprod(0)  # shape(n,h,w,1)
+            mcs = (masks_color * inv_alph_masks).sum(0) * 2  # mask color summand shape(n,h,w,3)
 
-        im_gpu = im_gpu.flip(dims=[0])  # flip channel
-        im_gpu = im_gpu.permute(1, 2, 0).contiguous()  # shape(h,w,3)
-        im_gpu = im_gpu * inv_alph_masks[-1] + mcs
-        im_mask = (im_gpu * 255).byte().cpu().numpy()
-        self.im[:] = im_mask if retina_masks else scale_image(im_gpu.shape, im_mask, self.im.shape)
+            im_gpu = im_gpu.flip(dims=[0])  # flip channel
+            im_gpu = im_gpu.permute(1, 2, 0).contiguous()  # shape(h,w,3)
+            im_gpu = im_gpu * inv_alph_masks[-1] + mcs
+            im_mask = (im_gpu * 255).byte().cpu().numpy()
+            self.im[:] = scale_image(im_gpu.shape, im_mask, self.im.shape)
         if self.pil:
             # convert im back to PIL and update draw
             self.fromarray(self.im)
@@ -451,7 +465,7 @@ def imshow_cls(im, labels=None, pred=None, names=None, nmax=25, verbose=False, f
     plt.savefig(f, dpi=300, bbox_inches='tight')
     plt.close()
     if verbose:
-        LOGGER.info(f'Saving {f}')
+        LOGGER.info(f"Saving {f}")
         if labels is not None:
             LOGGER.info('True:     ' + ' '.join(f'{names[i]:3s}' for i in labels[:nmax]))
         if pred is not None:
@@ -501,8 +515,7 @@ def plot_results(file='path/to/results.csv', dir=''):
             for i, j in enumerate([1, 2, 3, 4, 5, 8, 9, 10, 6, 7]):
                 y = data.values[:, j].astype('float')
                 # y[y == 0] = np.nan  # don't show zero values
-                ax[i].plot(x, y, marker='.', label=f.stem, linewidth=2, markersize=8)  # actual results
-                ax[i].plot(x, gaussian_filter1d(y, sigma=3), ':', label='smooth', linewidth=2)  # smoothing line
+                ax[i].plot(x, y, marker='.', label=f.stem, linewidth=2, markersize=8)
                 ax[i].set_title(s[j], fontsize=12)
                 # if j in [8, 9, 10]:  # share train and val loss y axes
                 #     ax[i].get_shared_y_axes().join(ax[i], ax[i - 5])
