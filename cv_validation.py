@@ -1,30 +1,19 @@
+#file for cv validation when setup
 import torch
 import cv2
 import numpy as np
 from kalmanfilter import KalmanFilter
-import CvCmdApi
 #load model
 model = torch.hub.load('.', 'custom', path='Trained_model/cv4control_v5n.onnx', source='local')
 
-#capture video from camera
-# camera_id = "/dev/video0"
-# cap = cv2.VideoCapture(camera_id, cv2.CAP_V4L2)
-# cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-# cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-# cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
-# cap.set(cv2.CAP_PROP_FPS, 120)
-
-cv2control = CvCmdApi.CvCmdHandler()
 kf = KalmanFilter()
-cap = cv2.VideoCapture('2743.MP4')
+cap = cv2.VideoCapture('2743.mp4')
 
 while(True):
     ret, frame = cap.read()
     predict_x = 0
     predict_y = 0
     img = frame
-    #control mode input
-    oldflags = (False, False, False)
     try:
         img = model(frame)
         x0 = img.pandas().xyxy[0].to_dict('records')[0].get("xmin")
@@ -34,7 +23,6 @@ while(True):
         x_cen,y_cen = int((x0+x1)/2)-320,240-int((y0+y1)/2)
         print(x_cen,y_cen)
         predict_x, predict_y = kf.predict(x_cen,y_cen)
-        cv2control.CvCmd_Heartbeat(gimbal_coordinate_x=predict_x,gimbal_coordinate_y=predict_y,chassis_speed_x=0,chassis_speed_y=0)
     except Exception as e: 
         print(e)
     out_img = np.squeeze(img.render())
